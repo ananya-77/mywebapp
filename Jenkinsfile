@@ -12,14 +12,14 @@ pipeline {
         stage('Build') {
             steps {
                 echo "🔧 Building the Docker image..."
-                bat 'docker build -t mywebapp:latest .'
+                sh 'docker build -t mywebapp:latest .'
             }
         }
 
         stage('Test') {
             steps {
                 echo "🧪 Running simple container test..."
-                bat '''
+                sh '''
                 docker run --rm mywebapp:latest sh -c "echo Container test successful!"
                 '''
             }
@@ -39,10 +39,10 @@ pipeline {
                     '''
 
                     // Run Blue on port 9090
-                    bat 'docker run -d -p 9090:80 --name mywebapp_blue mywebapp:latest'
+                    sh 'docker run -d -p 9090:80 --name mywebapp_blue mywebapp:latest'
 
                     // Run Green on port 9091
-                    bat 'docker run -d -p 9091:80 --name mywebapp_green mywebapp:latest'
+                    sh 'docker run -d -p 9091:80 --name mywebapp_green mywebapp:latest'
 
                     echo "✅ Blue (9090) and Green (9091) containers are now running!"
                 }
