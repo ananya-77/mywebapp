@@ -12,7 +12,7 @@ pipeline {
         stage('Build') {
             steps {
                 echo "Building the application..."
-                bat 'echo Build step completed!'
+                bat 'docker build -t mywebapp:latest .'
             }
         }
 
@@ -26,33 +26,23 @@ pipeline {
         stage('Blue-Green Deploy') {
             steps {
                 script {
-                    echo "Starting Blue-Green deployment..."
+                    echo "🚀 Starting Blue-Green deployment..."
 
-                    // Stop & remove any old green container (on 9091)
+                    // Stop and remove old containers (clean start)
                     bat '''
+                    docker stop mywebapp_blue || echo "No blue container running"
+                    docker rm mywebapp_blue || echo "No blue container to remove"
                     docker stop mywebapp_green || echo "No green container running"
                     docker rm mywebapp_green || echo "No green container to remove"
                     '''
 
-                    // Build the latest image
-                    bat 'docker build -t mywebapp:latest .'
+                    // Run Blue on port 9090
+                    bat 'docker run -d -p 9090:80 --name mywebapp_blue mywebapp:latest'
 
-                    // Run the new version as GREEN on 9091
+                    // Run Green on port 9091
                     bat 'docker run -d -p 9091:80 --name mywebapp_green mywebapp:latest'
 
-                    // Optional health check
-                    bat 'echo Waiting for Green container health check...'
-                    sleep(time:10, unit:"SECONDS")
-
-                    // If green is healthy, swap traffic
-                    bat '''
-                    docker stop mywebapp_blue || echo "No blue container running"
-                    docker rm mywebapp_blue || echo "No blue container to remove"
-                    docker rename mywebapp_green mywebapp_blue
-                    docker run -d -p 9090:80 --name mywebapp_green mywebapp:latest
-                    '''
-
-                    echo "✅ Blue-Green deployment completed successfully!"
+                    echo "✅ Blue (9090) and Green (9091) containers are running!"
                 }
             }
         }
@@ -60,10 +50,10 @@ pipeline {
 
     post {
         success {
-            echo "Pipeline executed successfully!"
+            echo "🎉 Pipeline executed successfully!"
         }
         failure {
-            echo "Pipeline failed. Please check logs."
+            echo "❌ Pipeline failed. Please check logs."
         }
     }
 }
