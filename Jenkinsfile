@@ -1,22 +1,61 @@
-stage('Blue-Green Deploy') {
-    steps {
-        script {
-            echo "🚀 Starting Blue-Green deployment..."
+pipeline {
+    agent any
 
-            // Stop and remove existing containers
-            bat 'docker stop mywebapp_blue || echo No blue container running'
-            bat 'docker rm mywebapp_blue || echo No blue container to remove'
-            bat 'docker stop mywebapp_green || echo No green container running'
-            bat 'docker rm mywebapp_green || echo No green container to remove'
+    stages {
+        stage('Checkout') {
+            steps {
+                echo "📦 Cloning the repository..."
+                git branch: 'main', url: 'https://github.com/ananya-77/mywebapp.git'
+            }
+        }
 
-            // Build latest image
-            bat 'docker build -t mywebapp:latest .'
+        stage('Build') {
+            steps {
+                echo "🔧 Building the Docker image..."
+                bat 'docker build -t mywebapp:latest .'
+            }
+        }
 
-            // Start Blue and Green containers
-            bat 'docker run -d -p 9090:80 --name mywebapp_blue mywebapp:latest'
-            bat 'docker run -d -p 9091:80 --name mywebapp_green mywebapp:latest'
+        stage('Test') {
+            steps {
+                echo "🧪 Running simple container test..."
+                bat '''
+                docker run --rm mywebapp:latest sh -c "echo Container test successful!"
+                '''
+            }
+        }
 
-            echo "✅ Blue (9090) and Green (9091) containers are running!"
+        stage('Blue-Green Deploy') {
+            steps {
+                script {
+                    echo "🚀 Starting Blue-Green deployment..."
+
+                    // Stop and remove any existing containers
+                    bat '''
+                    docker stop mywebapp_blue || echo No blue container running
+                    docker rm mywebapp_blue || echo No blue container to remove
+                    docker stop mywebapp_green || echo No green container running
+                    docker rm mywebapp_green || echo No green container to remove
+                    '''
+
+                    // Run Blue on port 9090
+                    bat 'docker run -d -p 9090:80 --name mywebapp_blue mywebapp:latest'
+
+                    // Run Green on port 9091
+                    bat 'docker run -d -p 9091:80 --name mywebapp_green mywebapp:latest'
+
+                    echo "✅ Blue (9090) and Green (9091) containers are now running!"
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "🎉 Pipeline executed successfully!"
+        }
+        failure {
+            echo "❌ Pipeline failed. Check logs for details."
         }
     }
 }
