@@ -1,8 +1,13 @@
 pipeline {
     agent any
 
-    stages {
+    environment {
+        IMAGE_NAME = "mywebapp"
+        BLUE_PORT = "8080"
+        GREEN_PORT = "9090"
+    }
 
+    stages {
         stage('Checkout') {
             steps {
                 echo 'Cloning the repository...'
@@ -24,34 +29,45 @@ pipeline {
             }
         }
 
-        stage('Docker Build and Deploy') {
+        stage('Deploy') {
             steps {
-                echo 'Building and running Docker container...'
-                bat '''
-                echo Starting Docker deployment...
+                echo 'Starting Blue-Green Deployment...'
 
-                REM Stop and remove old container if it exists
-                docker stop mywebapp || echo "No container to stop"
-                docker rm mywebapp || echo "No container to remove"
+                // Step 1: Build new Docker image
+                bat 'docker build -t mywebapp:green .'
 
-                REM Build Docker image from Dockerfile
-                docker build -t mywebapp:latest .
+                // Step 2: Stop and remove old green container if it exists
+                bat 'docker stop mywebapp_green || exit 0'
+                bat 'docker rm mywebapp_green || exit 0'
 
-                REM Run the container mapping port 8080 on host to port 80 in container
-                docker run -d -p 8080:80 --name mywebapp mywebapp:latest
+                // Step 3: Run green container on alternate port
+                bat 'docker run -d --name mywebapp_green -p 9090:80 mywebapp:green'
 
-                echo Docker deployment completed successfully!
-                '''
+                // Step 4: Health check for green deployment
+                echo 'Checking if new container (green) is healthy...'
+                bat 'curl -f http://localhost:9090 || exit 1'
+
+                // Step 5: Stop and remove old blue (live) container
+                bat 'docker stop mywebapp_blue || exit 0'
+                bat 'docker rm mywebapp_blue || exit 0'
+
+                // Step 6: Rename green → blue (now live)
+                bat 'docker rename mywebapp_green mywebapp_blue'
+
+                echo 'Blue-Green Deployment successful!'
             }
         }
     }
 
     post {
         success {
-            echo '✅ Pipeline executed successfully!'
+            echo '✅ Pipeline executed successfully with Blue-Green deployment!'
         }
         failure {
-            echo '❌ Pipeline failed. Please check the logs.'
+            echo '❌ Deployment failed. Rolling back...'
+            bat 'docker stop mywebapp_green || exit 0'
+            bat 'docker rm mywebapp_green || exit 0'
+            bat 'docker start mywebapp_blue || exit 0'
         }
     }
 }
