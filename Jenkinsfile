@@ -31,7 +31,7 @@ pipeline {
                     echo "🚀 Starting Blue-Green deployment..."
 
                     // Stop and remove any existing containers
-                    bat '''
+                    sh '''
                     docker stop mywebapp_blue || echo No blue container running
                     docker rm mywebapp_blue || echo No blue container to remove
                     docker stop mywebapp_green || echo No green container running
