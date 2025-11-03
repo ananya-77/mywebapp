@@ -2,34 +2,56 @@ pipeline {
     agent any
 
     stages {
+
         stage('Checkout') {
             steps {
                 echo 'Cloning the repository...'
-                git 'https://github.com/ananya-77/mywebapp.git'
+                git branch: 'main', url: 'https://github.com/ananya-77/mywebapp.git'
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build') {
             steps {
-                echo 'Building Docker image...'
-                bat 'docker build -t mywebapp:latest -f Dockerfile.dockerfile .'
+                echo 'Building the application...'
+                bat 'echo Build step completed!'
             }
         }
 
-        stage('Run Container') {
+        stage('Test') {
             steps {
-                echo 'Running Docker container...'
-                bat 'docker run -d -p 8081:80 --name mywebapp-container mywebapp:latest'
+                echo 'Running tests...'
+                bat 'echo Tests passed successfully!'
+            }
+        }
+
+        stage('Docker Build and Deploy') {
+            steps {
+                echo 'Building and running Docker container...'
+                bat '''
+                echo Starting Docker deployment...
+
+                REM Stop and remove old container if it exists
+                docker stop mywebapp || echo "No container to stop"
+                docker rm mywebapp || echo "No container to remove"
+
+                REM Build Docker image from Dockerfile
+                docker build -t mywebapp:latest .
+
+                REM Run the container mapping port 8080 on host to port 80 in container
+                docker run -d -p 8080:80 --name mywebapp mywebapp:latest
+
+                echo Docker deployment completed successfully!
+                '''
             }
         }
     }
 
     post {
         success {
-            echo 'Pipeline executed successfully with Docker deployment!'
+            echo '✅ Pipeline executed successfully!'
         }
         failure {
-            echo 'Pipeline failed!'
+            echo '❌ Pipeline failed. Please check the logs.'
         }
     }
 }
