@@ -5,44 +5,31 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo 'Cloning the repository...'
-                git branch: 'main', url: 'https://github.com/ananya-77/mywebapp.git'
+                git 'https://github.com/ananya-77/mywebapp.git'
             }
         }
 
-        stage('Build') {
+        stage('Build Docker Image') {
             steps {
-                echo 'Building the application...'
-                bat 'echo Build step completed!'
+                echo 'Building Docker image...'
+                bat 'docker build -t mywebapp:latest -f Dockerfile.dockerfile .'
             }
         }
 
-        stage('Test') {
+        stage('Run Container') {
             steps {
-                echo 'Running tests...'
-                bat 'echo Tests passed successfully!'
-            }
-        }
-
-        stage('Deploy') {
-            steps {
-                echo 'Deploying the application...'
-                bat '''
-                echo Starting deployment...
-                rmdir /S /Q "C:\\Users\\Ananya\\Desktop\\webapp_deploy"
-                mkdir "C:\\Users\\Ananya\\Desktop\\webapp_deploy"
-                xcopy "C:\\Users\\Ananya\\.jenkins\\workspace\\mywebapp-pipeline\\*" "C:\\Users\\Ananya\\Desktop\\webapp_deploy" /E /Y
-                echo Deployment completed successfully!
-                '''
+                echo 'Running Docker container...'
+                bat 'docker run -d -p 8081:80 --name mywebapp-container mywebapp:latest'
             }
         }
     }
 
     post {
         success {
-            echo 'Pipeline executed successfully!'
+            echo 'Pipeline executed successfully with Docker deployment!'
         }
         failure {
-            echo 'Pipeline failed.'
+            echo 'Pipeline failed!'
         }
     }
 }
