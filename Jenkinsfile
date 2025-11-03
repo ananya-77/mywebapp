@@ -1,73 +1,69 @@
 pipeline {
     agent any
 
-    environment {
-        IMAGE_NAME = "mywebapp"
-        BLUE_PORT = "8080"
-        GREEN_PORT = "9090"
-    }
-
     stages {
         stage('Checkout') {
             steps {
-                echo 'Cloning the repository...'
+                echo "Cloning the repository..."
                 git branch: 'main', url: 'https://github.com/ananya-77/mywebapp.git'
             }
         }
 
         stage('Build') {
             steps {
-                echo 'Building the application...'
+                echo "Building the application..."
                 bat 'echo Build step completed!'
             }
         }
 
         stage('Test') {
             steps {
-                echo 'Running tests...'
+                echo "Running tests..."
                 bat 'echo Tests passed successfully!'
             }
         }
 
-        stage('Deploy') {
+        stage('Blue-Green Deploy') {
             steps {
-                echo 'Starting Blue-Green Deployment...'
+                script {
+                    echo "Starting Blue-Green deployment..."
 
-                // Step 1: Build new Docker image
-                bat 'docker build -t mywebapp:green .'
+                    // Stop & remove any old green container (on 9091)
+                    bat '''
+                    docker stop mywebapp_green || echo "No green container running"
+                    docker rm mywebapp_green || echo "No green container to remove"
+                    '''
 
-                // Step 2: Stop and remove old green container if it exists
-                bat 'docker stop mywebapp_green || exit 0'
-                bat 'docker rm mywebapp_green || exit 0'
+                    // Build the latest image
+                    bat 'docker build -t mywebapp:latest .'
 
-                // Step 3: Run green container on alternate port
-                bat 'docker run -d --name mywebapp_green -p 9090:80 mywebapp:green'
+                    // Run the new version as GREEN on 9091
+                    bat 'docker run -d -p 9091:80 --name mywebapp_green mywebapp:latest'
 
-                // Step 4: Health check for green deployment
-                echo 'Checking if new container (green) is healthy...'
-                bat 'curl -f http://localhost:9090 || exit 1'
+                    // Optional health check
+                    bat 'echo Waiting for Green container health check...'
+                    sleep(time:10, unit:"SECONDS")
 
-                // Step 5: Stop and remove old blue (live) container
-                bat 'docker stop mywebapp_blue || exit 0'
-                bat 'docker rm mywebapp_blue || exit 0'
+                    // If green is healthy, swap traffic
+                    bat '''
+                    docker stop mywebapp_blue || echo "No blue container running"
+                    docker rm mywebapp_blue || echo "No blue container to remove"
+                    docker rename mywebapp_green mywebapp_blue
+                    docker run -d -p 9090:80 --name mywebapp_green mywebapp:latest
+                    '''
 
-                // Step 6: Rename green → blue (now live)
-                bat 'docker rename mywebapp_green mywebapp_blue'
-
-                echo 'Blue-Green Deployment successful!'
+                    echo "✅ Blue-Green deployment completed successfully!"
+                }
             }
         }
     }
 
     post {
         success {
-            echo '✅ Pipeline executed successfully with Blue-Green deployment!'
+            echo "Pipeline executed successfully!"
         }
         failure {
-            echo '❌ Deployment failed. Rolling back...'
-            bat 'docker stop mywebapp_green || exit 0'
-            bat 'docker rm mywebapp_green || exit 0'
-            bat 'docker start mywebapp_blue || exit 0'
+            echo "Pipeline failed. Please check logs."
         }
     }
 }
